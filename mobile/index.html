@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Emergency Rescue</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --danger: #ef4444;
+            --danger-dark: #b91c1c;
+            --success: #10b981;
+            --text: #f8fafc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            max-width: 80%;
+            margin-bottom: 50px;
+        }
+
+        .sos-button {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--danger), var(--danger-dark));
+            border: 8px solid rgba(239, 68, 68, 0.2);
+            color: white;
+            font-size: 3rem;
+            font-weight: 800;
+            font-family: 'Outfit', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 15px 35px rgba(239, 68, 68, 0.4), inset 0 -10px 20px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sos-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4), inset 0 -5px 10px rgba(0,0,0,0.3);
+        }
+
+        .sos-button.success {
+            background: radial-gradient(circle at 30% 30%, var(--success), #047857);
+            border-color: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 15px 35px rgba(16, 185, 129, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 30px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .status {
+            margin-top: 40px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--danger);
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>DISPATCH</h1>
+    
+    <div id="dispatchControls">
+        <button id="sosBtn" class="sos-button">SOS</button>
+        <p id="statusText" class="status"></p>
+        <button class="check-status-btn" id="checkStatusBtn" style="display: none; margin-top: 20px; font-size: 1.2rem; font-weight: bold; background: #2c3e50; border: 2px solid #34495e; color: white; padding: 15px 30px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease;">CHECK ARRIVAL STATUS</button>
+    </div>
+
+    <script>
+        const btn = document.getElementById('sosBtn');
+        const status = document.getElementById('statusText');
+
+        btn.addEventListener('click', () => {
+            status.innerText = "Acquiring GPS Signal...";
+            status.style.color = "#3b82f6";
+            
+            if (!navigator.geolocation) {
+                status.innerText = "GPS is not supported by your browser";
+                status.style.color = "var(--danger)";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    status.innerText = `GPS Locked: ${lat.toFixed(4)}, ${lon.toFixed(4)}\nDispatching drone...`;
+                    
+                    try {
+                        const response = await fetch('/dispatch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lat: lat, lon: lon })
+                        });
+
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            btn.innerHTML = "INBOUND";
+                            btn.classList.add("success");
+                            status.innerText = "DRONE DISPATCHED! ETA: 3 Minutes.";
+                            status.style.color = "var(--success)";
+                            document.getElementById('checkStatusBtn').style.display = 'block';
+                        } else {
+                            status.innerText = "Dispatch Failed: " + result.error;
+                            status.style.color = "var(--danger)";
+                        }
+                    } catch (err) {
+                        status.innerText = "Network Error: Could not reach Dispatch Server.";
+                        status.style.color = "var(--danger)";
+                    }
+                },
+                (error) => {
+                    status.innerText = "HTTPS required for real GPS.\nUsing simulated coordinates...";
+                    status.style.color = "#f59e0b";
+                    
+                    setTimeout(async () => {
+                        try {
+                            const response = await fetch('/dispatch', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ lat: -35.3622, lon: 149.1652 })
+                            });
+
+                            if (response.ok) {
+                                btn.innerHTML = "INBOUND";
+                                btn.classList.add("success");
+                                status.innerText = "DRONE DISPATCHED! ETA: 3 Minutes.";
+                                status.style.color = "var(--success)";
+                                document.getElementById('checkStatusBtn').style.display = 'block';
+                            }
+                        } catch(err) {
+                            status.innerText = "Network Error: Could not reach Dispatch Server.";
+                            status.style.color = "var(--danger)";
+                        }
+                    }, 1500);
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        });
+
+            // Check Status Button Logic
+            document.getElementById('checkStatusBtn').addEventListener('click', async () => {
+                const checkBtn = document.getElementById('checkStatusBtn');
+                checkBtn.innerText = "CHECKING...";
+                
+                try {
+                    const response = await fetch('/status');
+                    const data = await response.json();
+                    
+                    if (data.status === 'COMPLETE') {
+                        const sosBtn = document.getElementById('sosBtn');
+                        const statusText = document.getElementById('statusText');
+                        
+                        sosBtn.style.background = 'linear-gradient(135deg, #3498db, #2980b9)';
+                        sosBtn.style.boxShadow = '0 15px 35px rgba(52, 152, 219, 0.4)';
+                        sosBtn.innerText = 'ARRIVED';
+                        
+                        statusText.innerText = 'PAYLOAD DELIVERED! MISSION COMPLETE.';
+                        statusText.style.color = '#3498db';
+                        checkBtn.style.display = 'none';
+                    } else {
+                        checkBtn.innerText = "STILL IN TRANSIT - CHECK AGAIN";
+                    }
+                } catch (e) {
+                    checkBtn.innerText = "CHECK ARRIVAL STATUS";
+                }
+            });
+        </script>
+    </body>
+</html>
